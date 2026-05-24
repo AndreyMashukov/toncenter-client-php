@@ -1,0 +1,54 @@
+{
+    "name": "amashukov/toncenter-client-php",
+    "description": "Typed toncenter v2 HTTP client for The Open Network — {ok, result} envelope unwrapping, retry-aware via any PSR-18 client, typed Value Objects (masterchain info, account state, run-get-method stack reader, transactions). Pluggable wallet RPC adapter.",
+    "type": "library",
+    "license": "MIT",
+    "keywords": ["ton", "the-open-network", "toncenter", "rpc", "json-rpc", "psr-18", "blockchain"],
+    "authors": [
+        {
+            "name": "Andrei Mashukov",
+            "email": "a.mashukoff@gmail.com",
+            "homepage": "https://github.com/AndreyMashukov"
+        }
+    ],
+    "require": {
+        "php": ">=8.3",
+        "ext-gmp": "*",
+        "amashukov/ton-wallet-php": "^0.1.0",
+        "psr/http-client": "^1.0",
+        "psr/http-factory": "^1.1",
+        "psr/http-message": "^2.0"
+    },
+    "require-dev": {
+        "amashukov/http-client-php": "^0.1.0",
+        "amashukov/rector-php-rules": "^0.1.0",
+        "friendsofphp/php-cs-fixer": "^3.50",
+        "nyholm/psr7": "^1.8",
+        "phpstan/phpstan": "^2.0",
+        "phpunit/phpunit": "^11.0",
+        "rector/rector": "^2.0"
+    },
+    "suggest": {
+        "amashukov/http-client-php": "PSR-18 cURL client + retry/header-injection middleware ready to wire the X-Api-Key + 5xx/429 retry pipeline this client expects."
+    },
+    "autoload": {
+        "psr-4": {
+            "Amashukov\\Toncenter\\": "src/"
+        }
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "Amashukov\\Toncenter\\Tests\\": "tests/"
+        }
+    },
+    "config": {
+        "sort-packages": true
+    },
+    "scripts": {
+        "test": "phpunit",
+        "stan": "phpstan analyse --memory-limit=512M",
+        "cs": "php-cs-fixer fix --dry-run --diff",
+        "cs-fix": "php-cs-fixer fix",
+        "rector": "rector process --dry-run"
+    }
+}
