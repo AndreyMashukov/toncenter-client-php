@@ -3,7 +3,12 @@
     "description": "Typed toncenter v2 HTTP client for The Open Network — {ok, result} envelope unwrapping, retry-aware via any PSR-18 client, typed Value Objects (masterchain info, account state, run-get-method stack reader, transactions). Pluggable wallet RPC adapter.",
     "type": "library",
     "license": "MIT",
-    "keywords": ["ton", "the-open-network", "toncenter", "rpc", "json-rpc", "psr-18", "blockchain"],
+    "homepage": "https://github.com/AndreyMashukov/toncenter-client-php",
+    "keywords": ["ton", "the-open-network", "toncenter", "rpc", "json-rpc", "psr-18", "blockchain", "ton-api", "ton-client", "wallet", "value-object", "php"],
+    "support": {
+        "issues": "https://github.com/AndreyMashukov/toncenter-client-php/issues",
+        "source": "https://github.com/AndreyMashukov/toncenter-client-php"
+    },
     "authors": [
         {
             "name": "Andrei Mashukov",
