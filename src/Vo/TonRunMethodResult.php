@@ -19,11 +19,11 @@ final readonly class TonRunMethodResult
     }
 
     /**
-     * @param array<string, mixed> $envelope toncenter `/runGetMethod` result envelope
+     * @param array<string, mixed> $result unwrapped toncenter `/runGetMethod` `result` (envelope `ok` already stripped; success = `exit_code` 0)
      */
-    public static function fromToncenter(array $envelope): self
+    public static function fromToncenter(array $result): self
     {
-        $stackRaw = $envelope['stack'] ?? [];
+        $stackRaw = $result['stack'] ?? [];
         $stack    = is_array($stackRaw) ? $stackRaw : [];
 
         $normalized = [];
@@ -33,10 +33,12 @@ final readonly class TonRunMethodResult
             }
         }
 
+        $exitCode = Wire::int($result['exit_code'] ?? null, -1);
+
         return new self(
-            ok: (bool) ($envelope['ok'] ?? false),
-            exitCode: Wire::int($envelope['exit_code'] ?? null, -1),
-            gasUsed: Wire::int($envelope['gas_used'] ?? null),
+            ok: 0 === $exitCode,
+            exitCode: $exitCode,
+            gasUsed: Wire::int($result['gas_used'] ?? null),
             stack: TonTupleReader::fromRawStack($normalized),
         );
     }

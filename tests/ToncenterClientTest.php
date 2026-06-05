@@ -59,11 +59,12 @@ final class ToncenterClientTest extends TestCase
 
     public function testRunMethodPostsJsonBodyAndReadsStack(): void
     {
-        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":{"ok":true,"exit_code":0,"gas_used":100,"stack":[["num","0x2a"]]}}'));
+        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":{"@type":"smc.runResult","exit_code":0,"gas_used":100,"stack":[["num","0x2a"]]}}'));
         $client = new ToncenterClient($stub, $this->factory, $this->factory);
 
         $result = $client->runMethod('EQAddr', 'seqno', [['num', '1']]);
 
+        self::assertTrue($result->isOk());
         self::assertSame(42, $result->stack->readNumber());
 
         $request = $this->lastRequest($stub);

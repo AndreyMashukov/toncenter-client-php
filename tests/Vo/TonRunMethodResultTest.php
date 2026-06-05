@@ -9,10 +9,10 @@ use PHPUnit\Framework\TestCase;
 
 final class TonRunMethodResultTest extends TestCase
 {
-    public function testParsesEnvelopeAndStack(): void
+    public function testParsesResultAndStack(): void
     {
         $result = TonRunMethodResult::fromToncenter([
-            'ok'        => true,
+            '@type'     => 'smc.runResult',
             'exit_code' => 0,
             'gas_used'  => 1337,
             'stack'     => [['num', '0x2a']],
@@ -25,15 +25,30 @@ final class TonRunMethodResultTest extends TestCase
         self::assertSame(42, $result->stack->readNumber());
     }
 
+    public function testIsOkTrueForRealToncenterResultWithoutOkKey(): void
+    {
+        $result = TonRunMethodResult::fromToncenter([
+            '@type'     => 'smc.runResult',
+            'gas_used'  => 837,
+            'exit_code' => 0,
+            'stack'     => [['num', '0x186a0']],
+        ]);
+
+        self::assertTrue($result->ok);
+        self::assertTrue($result->isOk());
+        self::assertSame(100000, $result->stack->readNumber());
+    }
+
     public function testIsOkFalseWhenExitCodeNonZero(): void
     {
         $result = TonRunMethodResult::fromToncenter([
-            'ok'        => true,
+            '@type'     => 'smc.runResult',
             'exit_code' => 4,
             'gas_used'  => 0,
             'stack'     => [],
         ]);
 
+        self::assertFalse($result->ok);
         self::assertFalse($result->isOk());
     }
 
