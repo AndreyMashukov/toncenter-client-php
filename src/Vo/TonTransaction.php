@@ -179,7 +179,8 @@ final readonly class TonTransaction
      */
     private static function parseMessage(array $msg): TonTransactionMessage
     {
-        $msgData = (array) ($msg['msg_data'] ?? []);
+        $msgData  = (array) ($msg['msg_data'] ?? []);
+        $bodyText = self::nullableStringField($msg, 'message') ?? self::nullableStringField($msgData, 'text');
 
         return new TonTransactionMessage(
             source: self::nullableStringField($msg, 'source'),
@@ -189,10 +190,10 @@ final readonly class TonTransaction
             ihrFee: self::nullableStringField($msg, 'ihr_fee'),
             createdLt: self::nullableIntField($msg, 'created_lt'),
             bodyHash: self::nullableStringField($msg, 'body_hash'),
-            bodyText: self::nullableStringField($msg, 'message') ?? self::nullableStringField($msgData, 'text'),
+            bodyText: $bodyText,
             bodyBoc: self::nullableStringField($msgData, 'body'),
             opcode: self::nullableIntField($msg, 'op'),
-            bounced: (bool) ($msg['bounced'] ?? false),
+            bounced: (bool) ($msg['bounced'] ?? false) || str_starts_with($bodyText ?? '', '/////w'),
         );
     }
 

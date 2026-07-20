@@ -8,7 +8,6 @@ use Amashukov\Toncenter\Vo\TonTupleItemBuilder;
 use Amashukov\Toncenter\Vo\TonTupleItemCell;
 use Amashukov\Toncenter\Vo\TonTupleItemInt;
 use Amashukov\Toncenter\Vo\TonTupleItemNull;
-use Amashukov\Toncenter\Vo\TonTupleItemSlice;
 use Amashukov\Toncenter\Vo\TonTupleItemTuple;
 use Amashukov\Toncenter\Vo\TonTupleReader;
 use LogicException;

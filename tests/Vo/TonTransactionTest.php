@@ -119,6 +119,36 @@ final class TonTransactionTest extends TestCase
         self::assertSame('900000000', $tx->outMsgs[0]->value);
     }
 
+    public function testDetectsABounceFromTheBodyPrefixWhenToncenterOmitsTheFlag(): void
+    {
+        $tx = TonTransaction::fromToncenter($this->row([
+            'compute_ph' => ['type' => 'vm', 'success' => true, 'exit_code' => 0],
+            'aborted'    => false,
+        ], [
+            'in_msg'   => ['source' => 'EQSender', 'destination' => 'EQBridge', 'value' => '1000000000'],
+            'out_msgs' => [
+                ['source' => 'EQBridge', 'destination' => 'EQSender', 'value' => '990000000', 'message' => '/////wAAAAA='],
+            ],
+        ]));
+
+        self::assertTrue($tx->outMsgs[0]->bounced);
+    }
+
+    public function testDoesNotCallAnOrdinaryMemoABounce(): void
+    {
+        $tx = TonTransaction::fromToncenter($this->row([
+            'compute_ph' => ['type' => 'vm', 'success' => true, 'exit_code' => 0],
+            'aborted'    => false,
+        ], [
+            'in_msg'   => ['source' => 'EQSender', 'destination' => 'EQBridge', 'value' => '1000000000'],
+            'out_msgs' => [
+                ['source' => 'EQBridge', 'destination' => 'EQDest', 'value' => '990000000', 'message' => 'order-4242'],
+            ],
+        ]));
+
+        self::assertFalse($tx->outMsgs[0]->bounced);
+    }
+
     public function testAccountAddressFallsBackToRowWhenArgEmpty(): void
     {
         $tx = TonTransaction::fromToncenter($this->row([
