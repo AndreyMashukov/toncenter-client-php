@@ -59,7 +59,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
     {
         $typed = [];
         foreach ($this->fetchTransactions($address, $opts) as $row) {
-            $typed[] = TonTransaction::fromToncenter($row, $address);
+            $typed[] = $this->transactionWithData($row, $address, '/getTransactions');
         }
 
         return $typed;
@@ -77,7 +77,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
             return TonTransaction::fromToncenter(null, $address);
         }
 
-        return TonTransaction::fromToncenter($first, $address);
+        return $this->transactionWithData($first, $address, '/getTransactions');
     }
 
     public function tryLocateResultTx(string $source, string $destination, string $createdLt): ?TonTransaction
@@ -100,7 +100,20 @@ final readonly class ToncenterClient implements ToncenterClientInterface
             throw new TonRpcException('Toncenter GET /tryLocateResultTx: result is not a transaction object');
         }
 
-        return TonTransaction::fromToncenter($this->stringKeyed($row), $destination);
+        return $this->transactionWithData($this->stringKeyed($row), $destination, '/tryLocateResultTx');
+    }
+
+    /**
+     * @param array<string, mixed> $row
+     */
+    private function transactionWithData(array $row, string $address, string $path): TonTransaction
+    {
+        $data = $row['data'] ?? null;
+        if (!is_string($data) || '' === $data) {
+            throw new TonRpcException(sprintf('Toncenter GET %s: a transaction row carries no "data", so its phases cannot be read', $path));
+        }
+
+        return TonTransaction::fromToncenter($row, $address);
     }
 
     public function runMethod(string $address, string $method, array $stack = []): TonRunMethodResult

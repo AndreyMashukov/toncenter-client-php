@@ -6,6 +6,7 @@ namespace Amashukov\Toncenter\Tests;
 
 use Amashukov\Toncenter\Tests\Support\StubClientException;
 use Amashukov\Toncenter\Tests\Support\StubHttpClient;
+use Amashukov\Toncenter\Tests\Support\TransactionCellBuilder;
 use Amashukov\Toncenter\ToncenterClient;
 use Amashukov\Toncenter\TonRpcException;
 use Nyholm\Psr7\Factory\Psr17Factory;
@@ -89,7 +90,7 @@ final class ToncenterClientTest extends TestCase
 
     public function testGetTypedTransactionsWrapsEachRow(): void
     {
-        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":[{"transaction_id":{"hash":"h1","lt":"10"},"description":{"compute_ph":{"type":"vm","success":true,"exit_code":0},"aborted":false}}]}'));
+        $stub   = new StubHttpClient($this->json(200, sprintf('{"ok":true,"result":[{"transaction_id":{"hash":"h1","lt":"10"},"data":"%s"}]}', (new TransactionCellBuilder())->base64())));
         $client = new ToncenterClient($stub, $this->factory, $this->factory);
 
         $txs = $client->getTypedTransactions('EQAddr', ['limit' => 1, 'archival' => true]);
@@ -114,7 +115,7 @@ final class ToncenterClientTest extends TestCase
 
     public function testGetTypedTransactionMatchesOnLt(): void
     {
-        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":[{"transaction_id":{"hash":"h1","lt":"10"},"description":{"compute_ph":{"type":"vm","success":true,"exit_code":0},"aborted":false}}]}'));
+        $stub   = new StubHttpClient($this->json(200, sprintf('{"ok":true,"result":[{"transaction_id":{"hash":"h1","lt":"10"},"data":"%s"}]}', (new TransactionCellBuilder())->base64())));
         $client = new ToncenterClient($stub, $this->factory, $this->factory);
 
         $tx = $client->getTypedTransaction('EQAddr', '10', 'h1');
@@ -185,7 +186,7 @@ final class ToncenterClientTest extends TestCase
 
     public function testTryLocateResultTxReturnsTheDestinationTransaction(): void
     {
-        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":{"utime":1700000000,"transaction_id":{"lt":"1000001","hash":"cmVzdWx0"},"in_msg":{"source":"EQSource","destination":"EQDestination","value":"5","created_lt":"1000000"},"out_msgs":[]}}'));
+        $stub   = new StubHttpClient($this->json(200, sprintf('{"ok":true,"result":{"utime":1700000000,"transaction_id":{"lt":"1000001","hash":"cmVzdWx0"},"data":"%s","in_msg":{"source":"EQSource","destination":"EQDestination","value":"5","created_lt":"1000000"},"out_msgs":[]}}', (new TransactionCellBuilder())->base64())));
         $client = new ToncenterClient($stub, $this->factory, $this->factory);
 
         $transaction = $client->tryLocateResultTx('EQSource', 'EQDestination', '1000000');
@@ -194,6 +195,27 @@ final class ToncenterClientTest extends TestCase
         self::assertSame('cmVzdWx0', $transaction->hash);
         self::assertSame('EQDestination', $transaction->accountAddress);
         self::assertSame('https://toncenter.com/api/v2/tryLocateResultTx?source=EQSource&destination=EQDestination&created_lt=1000000', (string) $this->lastRequest($stub)->getUri());
+    }
+
+    public function testATransactionRowWithoutDataIsRefusedRatherThanReadAsSuccessful(): void
+    {
+        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":[{"transaction_id":{"hash":"h1","lt":"10"},"out_msgs":[]}]}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $this->expectException(TonRpcException::class);
+        $this->expectExceptionMessage('carries no "data"');
+
+        $client->getTypedTransactions('EQAddr');
+    }
+
+    public function testALocatedResultWithoutDataIsRefused(): void
+    {
+        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":{"utime":1700000000,"transaction_id":{"lt":"1000001","hash":"cmVzdWx0"},"out_msgs":[]}}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $this->expectException(TonRpcException::class);
+
+        $client->tryLocateResultTx('EQSource', 'EQDestination', '1000000');
     }
 
     public function testTryLocateResultTxAnswersNullWhileTheTransactionIsUnknown(): void
