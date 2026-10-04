@@ -183,6 +183,38 @@ final class ToncenterClientTest extends TestCase
         self::assertStringStartsWith('https://my-proxy.local/ton/v2/getAddressBalance', (string) $this->lastRequest($stub)->getUri());
     }
 
+    public function testTryLocateResultTxReturnsTheDestinationTransaction(): void
+    {
+        $stub   = new StubHttpClient($this->json(200, '{"ok":true,"result":{"utime":1700000000,"transaction_id":{"lt":"1000001","hash":"cmVzdWx0"},"in_msg":{"source":"EQSource","destination":"EQDestination","value":"5","created_lt":"1000000"},"out_msgs":[]}}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $transaction = $client->tryLocateResultTx('EQSource', 'EQDestination', '1000000');
+
+        self::assertNotNull($transaction);
+        self::assertSame('cmVzdWx0', $transaction->hash);
+        self::assertSame('EQDestination', $transaction->accountAddress);
+        self::assertSame('https://toncenter.com/api/v2/tryLocateResultTx?source=EQSource&destination=EQDestination&created_lt=1000000', (string) $this->lastRequest($stub)->getUri());
+    }
+
+    public function testTryLocateResultTxAnswersNullWhileTheTransactionIsUnknown(): void
+    {
+        $stub   = new StubHttpClient($this->json(200, '{"ok":false,"error":"transaction was not found","code":404}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        self::assertNull($client->tryLocateResultTx('EQSource', 'EQDestination', '1000000'));
+    }
+
+    public function testTryLocateResultTxPassesEveryOtherFailureOn(): void
+    {
+        $stub   = new StubHttpClient($this->json(200, '{"ok":false,"error":"rate limit","code":429}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $this->expectException(TonRpcException::class);
+        $this->expectExceptionCode(429);
+
+        $client->tryLocateResultTx('EQSource', 'EQDestination', '1000000');
+    }
+
     private function json(int $status, string $body): ResponseInterface
     {
         return $this->factory->createResponse($status)->withBody($this->factory->createStream($body));

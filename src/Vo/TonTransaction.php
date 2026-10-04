@@ -24,6 +24,7 @@ final readonly class TonTransaction
         public string $endStatus,
         public ?TonTransactionMessage $inMsg,
         public array $outMsgs,
+        public ?TonTransactionDescription $description = null,
     ) {}
 
     public function isStatusSuccess(): bool
@@ -77,6 +78,13 @@ final readonly class TonTransaction
             : null;
         $aborted      = (bool) ($description['aborted'] ?? false);
         $destroyed    = (bool) ($description['destroyed'] ?? false);
+        $fromData     = [] === $description ? self::descriptionFromData($row) : null;
+        if ($fromData instanceof TonTransactionDescription) {
+            $computePhase = $fromData->computePhase;
+            $actionPhase  = $fromData->actionPhase;
+            $aborted      = $fromData->aborted;
+            $destroyed    = $fromData->destroyed;
+        }
         $oldStatus    = Wire::str($description['old_status'] ?? null, 'nonexist');
         $endStatus    = Wire::str($description['end_status'] ?? null, 'nonexist');
         $status       = self::deriveStatus($computePhase, $actionPhase, $aborted);
@@ -111,7 +119,18 @@ final readonly class TonTransaction
             endStatus: $endStatus,
             inMsg: $inMsg,
             outMsgs: $outMsgs,
+            description: $fromData,
         );
+    }
+
+    /**
+     * @param array<array-key, mixed> $row
+     */
+    private static function descriptionFromData(array $row): ?TonTransactionDescription
+    {
+        $data = $row['data'] ?? null;
+
+        return is_string($data) && '' !== $data ? TonTransactionDescription::fromTransactionBoc($data) : null;
     }
 
     private static function deriveStatus(TonComputePhase $computePhase, ?TonActionPhase $actionPhase, bool $aborted): TonTransactionStatus

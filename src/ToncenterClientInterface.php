@@ -52,6 +52,16 @@ interface ToncenterClientInterface
     public function getTypedTransaction(string $address, string $lt, string $hash): TonTransaction;
 
     /**
+     * The transaction in which $destination processed the internal message $source created
+     * at logical time $createdLt (toncenter `tryLocateResultTx`). Null while no such
+     * transaction is known; the lookup does not page through the destination's history,
+     * so it answers for an address with any amount of traffic.
+     *
+     * @throws TonRpcException on transport, HTTP or envelope failures other than "not found"
+     */
+    public function tryLocateResultTx(string $source, string $destination, string $createdLt): ?TonTransaction;
+
+    /**
      * Runs a smart-contract get-method and wraps the response in a typed
      * `TonRunMethodResult` (ok + exit_code + gas_used + `TonTupleReader` stack).
      *

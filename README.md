@@ -16,6 +16,7 @@ A **typed PHP client for the [toncenter v2 HTTP API](https://toncenter.com/api/v
 
 - **`{ok, result}` envelope unwrapping in one place** — a non-`200` status, `ok: false`, or a missing `result` becomes a `TonRpcException`; business code never touches the envelope.
 - **Typed Value Objects** — masterchain info, account state, run-get-method stack reader, and a five-state transaction status (`Pending`, `Success`, `ComputePhaseFailed`, `ActionPhaseFailed`, `Aborted`) derived from the TVM compute / action phases.
+- **Transaction phases from the transaction BOC** — toncenter v2 answers `getTransactions` without a `description`, so a naive reader sees every transaction as successful. When the row has no `description`, the client parses the TL-B `Transaction` in the row's `data` field: credit, compute and action phases, `aborted`, whether a bounce message was sent, and `destroyed` land in `TonTransaction::$description` (`TonTransactionDescription`) and drive the status.
 - **Decimal-string big numbers** — balances and gas values are returned as decimal strings, safe past `PHP_INT_MAX`.
 - **Transport-agnostic** — bring your own PSR-18 client and PSR-17 factories. The retry policy and the `X-Api-Key` rate-limit header are middleware concerns, not baked into the client.
 - **542 / 429 retry decider** — toncenter emits transient `542` ("no workers available") and `429`; the recommended retry status set is documented so a retry middleware can target exactly those.
@@ -82,6 +83,23 @@ The stack reader is a cursor over a TON `TupleItem` sum-type
 (`TonTupleItemInt` / `Cell` / `Slice` / `Builder` / `Null` / `Tuple`) and
 decodes both decimal and `0x`-prefixed bigints via GMP.
 
+### Following a message to its result
+
+```php
+$result = $client->tryLocateResultTx($sourceAddress, $destinationAddress, $createdLt);
+if (null !== $result && null !== $result->description) {
+    $credited = $result->description->credited;   // nano-TON credited, null without a credit phase
+    $bounced  = $result->description->bounced;    // a bounce message was sent back
+    $executed = $result->isStatusSuccess();       // compute and action phases succeeded
+}
+```
+
+`tryLocateResultTx` asks toncenter for the transaction in which the destination
+processed one internal message, so it does not page through the destination's
+history and answers the same for a quiet wallet and for an exchange address with
+thousands of transactions a minute. It returns `null` while the transaction is not
+known yet.
+
 ### Broadcasting a wallet transfer
 
 ```php
@@ -103,6 +121,7 @@ $rpc->sendBoc($signedTransferBocBase64);
 | `isContractDeployed(string $address)` | `bool` |
 | `getTypedTransactions(string $address, array $opts = [])` | `list<TonTransaction>` |
 | `getTypedTransaction(string $address, string $lt, string $hash)` | `TonTransaction` |
+| `tryLocateResultTx(string $source, string $destination, string $createdLt)` | `?TonTransaction` |
 | `runMethod(string $address, string $method, array $stack = [])` | `TonRunMethodResult` |
 | `sendBoc(string $bocBase64)` | `TonSendBocResult` |
 

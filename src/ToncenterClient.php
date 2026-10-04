@@ -20,6 +20,8 @@ final readonly class ToncenterClient implements ToncenterClientInterface
 {
     public const string DEFAULT_BASE_URL = 'https://toncenter.com/api/v2';
 
+    private const int NOT_FOUND = 404;
+
     public function __construct(
         private ClientInterface $http,
         private RequestFactoryInterface $requestFactory,
@@ -76,6 +78,29 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         }
 
         return TonTransaction::fromToncenter($first, $address);
+    }
+
+    public function tryLocateResultTx(string $source, string $destination, string $createdLt): ?TonTransaction
+    {
+        try {
+            $row = $this->getJson('/tryLocateResultTx?' . http_build_query([
+                'source'      => $source,
+                'destination' => $destination,
+                'created_lt'  => $createdLt,
+            ]));
+        } catch (TonRpcException $exception) {
+            if (self::NOT_FOUND === $exception->getCode()) {
+                return null;
+            }
+
+            throw $exception;
+        }
+
+        if (!is_array($row)) {
+            throw new TonRpcException('Toncenter GET /tryLocateResultTx: result is not a transaction object');
+        }
+
+        return TonTransaction::fromToncenter($this->stringKeyed($row), $destination);
     }
 
     public function runMethod(string $address, string $method, array $stack = []): TonRunMethodResult
