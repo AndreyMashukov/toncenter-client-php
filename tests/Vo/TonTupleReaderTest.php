@@ -67,8 +67,11 @@ final class TonTupleReaderTest extends TestCase
             ['weird', 'x'],
         ]);
 
-        self::assertSame(TonTupleItemNull::class, $reader->pop()::class);
-        self::assertSame(TonTupleItemNull::class, $reader->pop()::class);
+        $first  = $reader->pop();
+        $second = $reader->pop();
+
+        self::assertInstanceOf(TonTupleItemNull::class, $first);
+        self::assertInstanceOf(TonTupleItemNull::class, $second);
     }
 
     public function testDecodesNestedTuple(): void

@@ -118,11 +118,26 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         $rows = [];
         foreach (is_array($raw) ? $raw : [] as $row) {
             if (is_array($row)) {
-                $rows[] = $row;
+                $rows[] = $this->stringKeyed($row);
             }
         }
 
         return $rows;
+    }
+
+    /**
+     * @param array<array-key, mixed> $row
+     *
+     * @return array<string, mixed>
+     */
+    private function stringKeyed(array $row): array
+    {
+        $keyed = [];
+        foreach ($row as $key => $value) {
+            $keyed[(string) $key] = $value;
+        }
+
+        return $keyed;
     }
 
     private function getJson(string $pathQs): mixed
