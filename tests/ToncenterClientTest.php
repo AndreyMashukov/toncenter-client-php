@@ -226,6 +226,49 @@ final class ToncenterClientTest extends TestCase
         self::assertNull($client->tryLocateResultTx('EQSource', 'EQDestination', '1000000'));
     }
 
+    public function testTryLocateResultTxAnswersNullWhenToncenterSendsTheNotFoundStatus(): void
+    {
+        $stub   = new StubHttpClient($this->json(404, '{"ok":false,"error":"transaction was not found","code":404}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        self::assertNull($client->tryLocateResultTx('EQSource', 'EQDestination', '1000000'));
+    }
+
+    public function testAnErrorStatusCarriesTheCodeAndMessageOfItsJsonBody(): void
+    {
+        $stub   = new StubHttpClient($this->json(429, '{"ok":false,"error":"Ratelimit exceed","code":429}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $this->expectException(TonRpcException::class);
+        $this->expectExceptionCode(429);
+        $this->expectExceptionMessage('returned HTTP 429: [429] Ratelimit exceed');
+
+        $client->getTypedTransactions('EQAddr');
+    }
+
+    public function testAnErrorStatusWithoutAJsonBodyKeepsTheStatusMessage(): void
+    {
+        $stub   = new StubHttpClient($this->json(502, '<html>Bad Gateway</html>'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $this->expectException(TonRpcException::class);
+        $this->expectExceptionCode(0);
+        $this->expectExceptionMessageMatches('~returned HTTP 502$~');
+
+        $client->getTypedTransactions('EQAddr');
+    }
+
+    public function testANotFoundStatusOnAnyOtherCallIsStillAnError(): void
+    {
+        $stub   = new StubHttpClient($this->json(404, '{"ok":false,"error":"account not found","code":404}'));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $this->expectException(TonRpcException::class);
+        $this->expectExceptionCode(404);
+
+        $client->getTypedTransactions('EQAddr');
+    }
+
     public function testTryLocateResultTxPassesEveryOtherFailureOn(): void
     {
         $stub   = new StubHttpClient($this->json(200, '{"ok":false,"error":"rate limit","code":429}'));

@@ -214,7 +214,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
 
         $status = $response->getStatusCode();
         if (200 !== $status) {
-            throw new TonRpcException(sprintf('Toncenter %s %s returned HTTP %d', $method, $path, $status));
+            throw $this->statusError($method, $path, $status, (string) $response->getBody());
         }
 
         try {
@@ -239,6 +239,25 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         }
 
         return $json['result'];
+    }
+
+    private function statusError(string $method, string $path, int $status, string $body): TonRpcException
+    {
+        $summary = sprintf('Toncenter %s %s returned HTTP %d', $method, $path, $status);
+
+        try {
+            $json = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+        } catch (JsonException) {
+            return new TonRpcException($summary);
+        }
+
+        if (!is_array($json) || false !== ($json['ok'] ?? null)) {
+            return new TonRpcException($summary);
+        }
+
+        $code = Wire::int($json['code'] ?? null);
+
+        return new TonRpcException(sprintf('%s: [%d] %s', $summary, $code, Wire::str($json['error'] ?? null, 'unknown')), $code);
     }
 
     /**
