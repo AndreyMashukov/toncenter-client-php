@@ -15,6 +15,8 @@ use Psr\Http\Client\ClientExceptionInterface;
 use Psr\Http\Client\ClientInterface;
 use Psr\Http\Message\RequestFactoryInterface;
 use Psr\Http\Message\StreamFactoryInterface;
+use Psr\Log\LoggerInterface;
+use Psr\Log\NullLogger;
 
 final readonly class ToncenterClient implements ToncenterClientInterface
 {
@@ -27,6 +29,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         private RequestFactoryInterface $requestFactory,
         private StreamFactoryInterface $streamFactory,
         private string $baseUrl = self::DEFAULT_BASE_URL,
+        private LoggerInterface $logger = new NullLogger(),
     ) {}
 
     public function getMasterchainInfo(): TonMasterchainInfo
@@ -87,9 +90,15 @@ final readonly class ToncenterClient implements ToncenterClientInterface
                 'source'      => $source,
                 'destination' => $destination,
                 'created_lt'  => $createdLt,
-            ]));
+            ]), expectedCodes: [self::NOT_FOUND]);
         } catch (TonRpcException $exception) {
             if (self::NOT_FOUND === $exception->getCode()) {
+                $this->logger->debug('Toncenter tryLocateResultTx: no result transaction for this message, answering null', [
+                    'source'      => $source,
+                    'destination' => $destination,
+                    'created_lt'  => $createdLt,
+                ]);
+
                 return null;
             }
 
@@ -178,9 +187,12 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         return $keyed;
     }
 
-    private function getJson(string $pathQs): mixed
+    /**
+     * @param list<int> $expectedCodes
+     */
+    private function getJson(string $pathQs, array $expectedCodes = []): mixed
     {
-        return $this->dispatch('GET', $pathQs, null);
+        return $this->dispatch('GET', $pathQs, null, $expectedCodes);
     }
 
     /**
@@ -193,8 +205,9 @@ final readonly class ToncenterClient implements ToncenterClientInterface
 
     /**
      * @param null|array<string, mixed> $body
+     * @param list<int>                 $expectedCodes
      */
-    private function dispatch(string $method, string $path, ?array $body): mixed
+    private function dispatch(string $method, string $path, ?array $body, array $expectedCodes = []): mixed
     {
         $request = $this->requestFactory
             ->createRequest($method, $this->baseUrl . $path)
@@ -206,39 +219,61 @@ final readonly class ToncenterClient implements ToncenterClientInterface
                 ->withBody($this->streamFactory->createStream($this->encode($body, $method, $path)));
         }
 
+        $this->logger->debug('Toncenter request', ['method' => $method, 'path' => $path]);
+
         try {
             $response = $this->http->sendRequest($request);
         } catch (ClientExceptionInterface $exception) {
-            throw new TonRpcException(sprintf('Toncenter %s %s: %s', $method, $path, $exception->getMessage()), 0, $exception);
+            throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: %s', $method, $path, $exception->getMessage()), 0, $exception), $method, $path, $expectedCodes);
         }
 
         $status = $response->getStatusCode();
+        $this->logger->debug('Toncenter response', ['method' => $method, 'path' => $path, 'status' => $status]);
+
         if (200 !== $status) {
-            throw $this->statusError($method, $path, $status, (string) $response->getBody());
+            throw $this->failed($this->statusError($method, $path, $status, (string) $response->getBody()), $method, $path, $expectedCodes);
         }
 
         try {
             $json = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
         } catch (JsonException $exception) {
-            throw new TonRpcException(sprintf('Toncenter %s %s: invalid JSON', $method, $path), 0, $exception);
+            throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: invalid JSON', $method, $path), 0, $exception), $method, $path, $expectedCodes);
         }
 
         if (!is_array($json)) {
-            throw new TonRpcException(sprintf('Toncenter %s %s: response is not a JSON object', $method, $path));
+            throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: response is not a JSON object', $method, $path)), $method, $path, $expectedCodes);
         }
 
         if (true !== ($json['ok'] ?? null)) {
             $err  = Wire::str($json['error'] ?? null, 'unknown');
             $code = Wire::int($json['code'] ?? null);
 
-            throw new TonRpcException(sprintf('Toncenter %s %s: [%d] %s', $method, $path, $code, $err), $code);
+            throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: [%d] %s', $method, $path, $code, $err), $code), $method, $path, $expectedCodes);
         }
 
         if (!\array_key_exists('result', $json)) {
-            throw new TonRpcException(sprintf('Toncenter %s %s: missing "result"', $method, $path));
+            throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: missing "result"', $method, $path)), $method, $path, $expectedCodes);
         }
 
         return $json['result'];
+    }
+
+    /**
+     * @param list<int> $expectedCodes
+     */
+    private function failed(TonRpcException $exception, string $method, string $path, array $expectedCodes): TonRpcException
+    {
+        $context = ['exception' => $exception, 'method' => $method, 'path' => $path, 'code' => $exception->getCode()];
+
+        if (\in_array($exception->getCode(), $expectedCodes, true)) {
+            $this->logger->debug('Toncenter request answered with an expected error code', $context);
+
+            return $exception;
+        }
+
+        $this->logger->error('Toncenter request failed', $context);
+
+        return $exception;
     }
 
     private function statusError(string $method, string $path, int $status, string $body): TonRpcException

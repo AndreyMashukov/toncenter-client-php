@@ -69,6 +69,18 @@ if ($account->isActive()) {
 }
 ```
 
+### Logging
+
+Pass any PSR-3 logger (`Psr\Log\LoggerInterface`, e.g. Monolog or a framework's logger) as the last constructor argument; without one the client logs nothing.
+
+```php
+$client = new ToncenterClient($http, $psr17, $psr17, ToncenterClient::DEFAULT_BASE_URL, $logger);
+```
+
+- `debug` — every request (`method`, `path`) and every response (`status`).
+- `error` — every failure that reaches the caller as a `TonRpcException`: transport error, non-`200` status, `ok: false`, invalid JSON, missing `result`. The context carries `exception`, `method`, `path` and toncenter's `code`.
+- An answer the client handles itself is not an error: toncenter's `404` "transaction was not found" from `tryLocateResultTx` is logged at `debug`, and the method returns `null`.
+
 ### Reading get-method results
 
 ```php
@@ -130,6 +142,7 @@ $rpc->sendBoc($signedTransferBocBase64);
 - PHP 8.3+
 - `ext-gmp` (bigint decoding of get-method stack values)
 - A PSR-18 client + PSR-17 request / stream factories
+- Optional: a PSR-3 logger
 
 ## Related packages
 
