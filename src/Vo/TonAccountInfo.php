@@ -17,6 +17,7 @@ final readonly class TonAccountInfo
         public ?string $dataBoc,
         public ?TonLastTransaction $lastTransaction,
         public ?int $syncUtime,
+        private bool $uninitializedEvidence = false,
     ) {}
 
     public function isActive(): bool
@@ -27,6 +28,11 @@ final readonly class TonAccountInfo
     public function isUninitialized(): bool
     {
         return TonAccountState::Uninitialized === $this->state;
+    }
+
+    public function isProvenUninitialized(): bool
+    {
+        return $this->isUninitialized() && $this->uninitializedEvidence;
     }
 
     public function isFrozen(): bool
@@ -65,6 +71,12 @@ final readonly class TonAccountInfo
             dataBoc: '' === $data ? null : $data,
             lastTransaction: $lastTx,
             syncUtime: $syncUtime,
+            uninitializedEvidence: in_array($row['state'] ?? null, ['uninitialized', 'uninit', 'nonexist'], true)
+                && is_string($balanceRaw)
+                && 1 === preg_match('/^[0-9]+$/D', $balanceRaw)
+                && in_array($row['code'] ?? null, [null, ''], true)
+                && in_array($row['data'] ?? null, [null, ''], true)
+                && array_key_exists('balance', $row),
         );
     }
 }
