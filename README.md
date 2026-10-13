@@ -163,3 +163,7 @@ $rpc->sendBoc($signedTransferBocBase64);
 ## License
 
 MIT — see [LICENSE](LICENSE).
+
+### Strict evidence for undeployed accounts
+
+`TonAccountInfo::isProvenUninitialized()` is suitable for deciding that a contract has no deployed token state. It requires an explicit `uninitialized`, `uninit` or `nonexist` wire state, an unsigned decimal-string native balance, and absent/empty code and data. Missing, unknown or malformed fields never qualify. Native TON may still be present at an undeployed address; this predicate does not mean its native balance is zero. The legacy `state` normalization and `isUninitialized()` remain compatible, including their defaults; use the strict predicate for absence decisions. Direct constructor calls have no strict wire evidence by default.

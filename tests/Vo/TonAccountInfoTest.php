@@ -56,6 +56,37 @@ final class TonAccountInfoTest extends TestCase
         self::assertNull($info->syncUtime);
     }
 
+    public function testOnlyExplicitUndeployedWireEvidenceProvesAnUninitializedAccount(): void
+    {
+        foreach (['uninitialized', 'uninit', 'nonexist'] as $state) {
+            $info = TonAccountInfo::fromArray('EQAddr', ['state' => $state, 'balance' => '42', 'code' => '', 'data' => '']);
+            self::assertTrue($info->isProvenUninitialized());
+            self::assertSame('42', $info->balance);
+        }
+    }
+
+    public function testLossyDefaultsAndContradictoryPayloadsNeverProveAnUninitializedAccount(): void
+    {
+        foreach ([
+            [],
+            ['state' => 'garbage', 'balance' => '0'],
+            ['state' => '', 'balance' => '0'],
+            ['state' => null, 'balance' => '0'],
+            ['state' => 'uninitialized'],
+            ['state' => 'uninitialized', 'balance' => 'not-a-number'],
+            ['state' => 'uninitialized', 'balance' => '-1'],
+            ['state' => 'uninitialized', 'balance' => '1.5'],
+            ['state' => 'uninitialized', 'balance' => 0],
+            ['state' => 'uninitialized', 'balance' => '0', 'code' => 'CODE=='],
+            ['state' => 'uninitialized', 'balance' => '0', 'data' => 'DATA=='],
+            ['state' => 'uninitialized', 'balance' => '0', 'code' => []],
+            ['state' => 'active', 'balance' => '0'],
+            ['state' => 'frozen', 'balance' => '0'],
+        ] as $row) {
+            self::assertFalse(TonAccountInfo::fromArray('EQAddr', $row)->isProvenUninitialized());
+        }
+    }
+
     public function testFrozenPredicate(): void
     {
         $info = TonAccountInfo::fromArray('EQAddr', ['state' => 'frozen', 'balance' => '0']);
