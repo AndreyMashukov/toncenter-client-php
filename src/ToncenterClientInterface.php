@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Amashukov\Toncenter;
 
 use Amashukov\Toncenter\Vo\TonAccountInfo;
+use Amashukov\Toncenter\Vo\TonFeeEstimate;
 use Amashukov\Toncenter\Vo\TonMasterchainInfo;
 use Amashukov\Toncenter\Vo\TonRunMethodResult;
 use Amashukov\Toncenter\Vo\TonSendBocResult;
@@ -74,4 +75,16 @@ interface ToncenterClientInterface
      * typed envelope carrying the broadcast hash (when present).
      */
     public function sendBoc(string $bocBase64): TonSendBocResult;
+
+    /**
+     * Estimate message processing fees without broadcasting (toncenter estimateFee).
+     * $bodyBoc is the base64 message body, not a full external message envelope.
+     * Optional code/data BOCs support an undeployed destination. Signature checking
+     * is skipped by default for unsigned estimates. Components are exact nanotons
+     * represented as decimal strings; missing or malformed fees throw TonRpcException.
+     * Destination coverage is provider-dependent: an empty list does not prove
+     * that downstream message execution is free or that a whole trace was priced.
+     */
+    public function estimateFee(string $address, string $bodyBoc, ?string $initCodeBoc = null, ?string $initDataBoc = null, bool $ignoreSignature = true): TonFeeEstimate;
+
 }

@@ -167,3 +167,27 @@ MIT — see [LICENSE](LICENSE).
 ### Strict evidence for undeployed accounts
 
 `TonAccountInfo::isProvenUninitialized()` is suitable for deciding that a contract has no deployed token state. It requires an explicit `uninitialized`, `uninit` or `nonexist` wire state, an unsigned decimal-string native balance, and absent/empty code and data. Missing, unknown or malformed fields never qualify. Native TON may still be present at an undeployed address; this predicate does not mean its native balance is zero. The legacy `state` normalization and `isUninitialized()` remain compatible, including their defaults; use the strict predicate for absence decisions. Direct constructor calls have no strict wire evidence by default.
+
+## Estimate message fees
+
+```php
+$estimate = $client->estimateFee($walletAddress, $unsignedBodyBoc);
+$sourceGasNanotons = $estimate->sourceFees->gasFee;
+```
+
+`estimateFee` calls the v2 `/estimateFee` endpoint without sending a transaction.
+Pass the base64 message **body**, not the complete external-message BOC. Optional
+`initCodeBoc` and `initDataBoc` support undeployed accounts. `ignoreSignature`
+defaults to `true`; pass `false` to require a valid signature during estimation.
+
+`TonFeeEstimate` preserves `sourceFees` and the ordered `destinationFees` list.
+Each `TonFeeBreakdown` exposes `inForwardFee`, `storageFee`, `gasFee` and
+`forwardFee` as nonnegative decimal strings in nanotons, including explicit zero.
+Missing, negative, fractional or malformed components raise `TonRpcException`;
+large JSON integers are preserved without floating-point conversion. Existing
+transport/envelope errors and logging apply to estimation as to other methods.
+
+This is an estimate, not a receipt or a guaranteed final charge. The provider may
+return no destination fees; that does not establish zero downstream cost or full
+trace coverage. Applications must establish which message executions are covered
+before using the estimate to price a multi-contract operation.

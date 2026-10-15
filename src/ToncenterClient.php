@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Amashukov\Toncenter;
 
 use Amashukov\Toncenter\Vo\TonAccountInfo;
+use Amashukov\Toncenter\Vo\TonFeeEstimate;
 use Amashukov\Toncenter\Vo\TonMasterchainInfo;
 use Amashukov\Toncenter\Vo\TonRunMethodResult;
 use Amashukov\Toncenter\Vo\TonSendBocResult;
@@ -136,6 +137,24 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         return TonRunMethodResult::fromToncenter(is_array($raw) ? $raw : []);
     }
 
+    public function estimateFee(string $address, string $bodyBoc, ?string $initCodeBoc = null, ?string $initDataBoc = null, bool $ignoreSignature = true): TonFeeEstimate
+    {
+        $request = ['address' => $address, 'body' => $bodyBoc, 'ignore_chksig' => $ignoreSignature];
+        if (null !== $initCodeBoc) {
+            $request['init_code'] = $initCodeBoc;
+        }
+        if (null !== $initDataBoc) {
+            $request['init_data'] = $initDataBoc;
+        }
+        $raw = $this->postJson('/estimateFee', $request);
+
+        try {
+            return TonFeeEstimate::fromToncenter($raw);
+        } catch (TonRpcException $exception) {
+            throw $this->failed($exception, 'POST', '/estimateFee', []);
+        }
+    }
+
     public function sendBoc(string $bocBase64): TonSendBocResult
     {
         $raw = $this->postJson('/sendBoc', ['boc' => $bocBase64]);
@@ -235,7 +254,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         }
 
         try {
-            $json = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR);
+            $json = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR | \JSON_BIGINT_AS_STRING);
         } catch (JsonException $exception) {
             throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: invalid JSON', $method, $path), 0, $exception), $method, $path, $expectedCodes);
         }
@@ -281,7 +300,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         $summary = sprintf('Toncenter %s %s returned HTTP %d', $method, $path, $status);
 
         try {
-            $json = json_decode($body, true, 512, \JSON_THROW_ON_ERROR);
+            $json = json_decode($body, true, 512, \JSON_THROW_ON_ERROR | \JSON_BIGINT_AS_STRING);
         } catch (JsonException) {
             return new TonRpcException($summary);
         }
