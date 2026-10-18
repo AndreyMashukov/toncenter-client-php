@@ -78,7 +78,9 @@ $client = new ToncenterClient($http, $psr17, $psr17, ToncenterClient::DEFAULT_BA
 ```
 
 - `debug` — every request (`method`, `path`) and every response (`status`).
-- `error` — every failure that reaches the caller as a `TonRpcException`: transport error, non-`200` status, `ok: false`, invalid JSON, missing `result`. The context carries `exception`, `method`, `path` and toncenter's `code`.
+- `warning` — a failure of the transport rather than of the request: the PSR-18 client threw (connection refused, timeout, a dropped connection) or toncenter answered with a `5xx` status. Such a failure usually passes on the next call, so it is logged as context, not as an incident.
+- `error` — every other failure that reaches the caller as a `TonRpcException`: a `4xx` status, `ok: false`, invalid JSON, missing `result`.
+- Both carry `exception`, `method`, `path` and toncenter's `code` in the context; the exception thrown is the same either way.
 - An answer the client handles itself is not an error: toncenter's `404` "transaction was not found" from `tryLocateResultTx` is logged at `debug`, and the method returns `null`.
 
 ### Reading get-method results

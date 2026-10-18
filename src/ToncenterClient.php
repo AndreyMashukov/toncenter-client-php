@@ -243,14 +243,14 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         try {
             $response = $this->http->sendRequest($request);
         } catch (ClientExceptionInterface $exception) {
-            throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: %s', $method, $path, $exception->getMessage()), 0, $exception), $method, $path, $expectedCodes);
+            throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: %s', $method, $path, $exception->getMessage()), 0, $exception), $method, $path, $expectedCodes, true);
         }
 
         $status = $response->getStatusCode();
         $this->logger->debug('Toncenter response', ['method' => $method, 'path' => $path, 'status' => $status]);
 
         if (200 !== $status) {
-            throw $this->failed($this->statusError($method, $path, $status, (string) $response->getBody()), $method, $path, $expectedCodes);
+            throw $this->failed($this->statusError($method, $path, $status, (string) $response->getBody()), $method, $path, $expectedCodes, $status >= 500);
         }
 
         try {
@@ -280,12 +280,18 @@ final readonly class ToncenterClient implements ToncenterClientInterface
     /**
      * @param list<int> $expectedCodes
      */
-    private function failed(TonRpcException $exception, string $method, string $path, array $expectedCodes): TonRpcException
+    private function failed(TonRpcException $exception, string $method, string $path, array $expectedCodes, bool $transport = false): TonRpcException
     {
         $context = ['exception' => $exception, 'method' => $method, 'path' => $path, 'code' => $exception->getCode()];
 
         if (\in_array($exception->getCode(), $expectedCodes, true)) {
             $this->logger->debug('Toncenter request answered with an expected error code', $context);
+
+            return $exception;
+        }
+
+        if ($transport) {
+            $this->logger->warning('Toncenter request failed', $context);
 
             return $exception;
         }

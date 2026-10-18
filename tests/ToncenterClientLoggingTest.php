@@ -10,6 +10,7 @@ use Amashukov\Toncenter\Tests\Support\StubHttpClient;
 use Amashukov\Toncenter\ToncenterClient;
 use Amashukov\Toncenter\TonRpcException;
 use Nyholm\Psr7\Factory\Psr17Factory;
+use PHPUnit\Framework\Attributes\DataProvider;
 use PHPUnit\Framework\TestCase;
 use Psr\Http\Client\ClientInterface;
 
@@ -47,7 +48,7 @@ final class ToncenterClientLoggingTest extends TestCase
         }
     }
 
-    public function testATransportFailureIsLoggedAsAnErrorCarryingTheException(): void
+    public function testATransportFailureIsLoggedAsAWarningCarryingTheException(): void
     {
         $client = $this->client(new StubHttpClient(null, new StubClientException('connection refused')));
 
@@ -55,8 +56,47 @@ final class ToncenterClientLoggingTest extends TestCase
             $client->getMasterchainInfo();
             self::fail('A transport failure must throw');
         } catch (TonRpcException $exception) {
-            self::assertSame(['debug Toncenter request', 'error Toncenter request failed'], $this->logger->lines());
+            self::assertSame(['debug Toncenter request', 'warning Toncenter request failed'], $this->logger->lines());
             self::assertSame($exception, $this->logger->records()[1]['context']['exception']);
+            self::assertSame(0, $this->logger->records()[1]['context']['code']);
+        }
+    }
+
+    /**
+     * @return iterable<string, array{int, string}>
+     */
+    public static function serverSideStatuses(): iterable
+    {
+        yield 'bad gateway page from a proxy' => [502, '<html><body>502 Bad Gateway</body></html>'];
+        yield 'service unavailable' => [503, '{"ok":false,"error":"Service unavailable","code":503}'];
+        yield 'gateway timeout' => [504, ''];
+    }
+
+    #[DataProvider('serverSideStatuses')]
+    public function testAServerSideStatusIsLoggedAsAWarning(int $status, string $body): void
+    {
+        $client = $this->client(new StubHttpClient($this->factory->createResponse($status)->withBody($this->factory->createStream($body))));
+
+        try {
+            $client->getBalance('EQAddr');
+            self::fail('A server-side status must throw');
+        } catch (TonRpcException $exception) {
+            self::assertSame(['debug Toncenter request', 'debug Toncenter response', 'warning Toncenter request failed'], $this->logger->lines());
+            self::assertSame($exception, $this->logger->records()[2]['context']['exception']);
+            self::assertStringContainsString(sprintf('returned HTTP %d', $status), $exception->getMessage());
+        }
+    }
+
+    public function testAnErrorEnvelopeOnA200IsStillAnError(): void
+    {
+        $client = $this->client(new StubHttpClient($this->factory->createResponse(200)->withBody($this->factory->createStream('{"ok":false,"error":"invalid address","code":416}'))));
+
+        try {
+            $client->getBalance('EQAddr');
+            self::fail('An ok:false envelope must throw');
+        } catch (TonRpcException) {
+            self::assertSame(['debug Toncenter request', 'debug Toncenter response', 'error Toncenter request failed'], $this->logger->lines());
+            self::assertSame(416, $this->logger->records()[2]['context']['code']);
         }
     }
 
