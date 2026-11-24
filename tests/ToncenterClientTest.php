@@ -6,6 +6,7 @@ namespace Amashukov\Toncenter\Tests;
 
 use Amashukov\Toncenter\Tests\Support\StubClientException;
 use Amashukov\Toncenter\Tests\Support\StubHttpClient;
+use Amashukov\Toncenter\Vo\TonTransactionMessage;
 use Amashukov\Toncenter\Tests\Support\TransactionCellBuilder;
 use Amashukov\Toncenter\ToncenterClient;
 use Amashukov\Toncenter\TonRpcException;
@@ -101,6 +102,22 @@ final class ToncenterClientTest extends TestCase
         $uri = (string) $this->lastRequest($stub)->getUri();
         self::assertStringContainsString('archival=true', $uri);
         self::assertStringContainsString('limit=1', $uri);
+    }
+
+    public function testGetTypedTransactionsReadsAHistoryWithAnEncryptedCommentWhoseTextIsRawBytes(): void
+    {
+        $row    = '{"transaction_id":{"hash":"h1","lt":"10"},"data":"' . (new TransactionCellBuilder())->base64() . '","in_msg":{"source":"EQSource","destination":"EQAddr","value":"236000000","msg_data":{"@type":"msg.dataEncryptedText","text":"AJmbxy0a"},"message":"\\u0000' . "\x99\x9b\xc7-" . '\\u001A' . "\x92wk" . '"},"out_msgs":[]}';
+        $stub   = new StubHttpClient($this->json(200, sprintf('{"ok":true,"result":[%s]}', $row)));
+        $client = new ToncenterClient($stub, $this->factory, $this->factory);
+
+        $txs = $client->getTypedTransactions('EQAddr', ['limit' => 50]);
+
+        self::assertCount(1, $txs);
+        self::assertSame('h1', $txs[0]->hash);
+        $inMsg = $txs[0]->inMsg;
+        self::assertInstanceOf(TonTransactionMessage::class, $inMsg);
+        self::assertSame('236000000', $inMsg->value);
+        self::assertSame('EQSource', $inMsg->source);
     }
 
     public function testGetTypedTransactionReturnsPendingOnLtMismatch(): void

@@ -83,6 +83,10 @@ $client = new ToncenterClient($http, $psr17, $psr17, ToncenterClient::DEFAULT_BA
 - Both carry `exception`, `method`, `path` and toncenter's `code` in the context; the exception thrown is the same either way.
 - An answer the client handles itself is not an error: toncenter's `404` "transaction was not found" from `tryLocateResultTx` is logged at `debug`, and the method returns `null`.
 
+### Message text that is not UTF-8
+
+toncenter v2 returns the `message` field of an encrypted comment (`msg.dataEncryptedText`) as raw bytes, so the JSON of such a history is not valid UTF-8. The client decodes every answer with `JSON_INVALID_UTF8_SUBSTITUTE`: a byte that is not UTF-8 becomes U+FFFD, and the amounts, addresses, hashes and lt of the history stay readable. `bodyText` of such a message carries the substituted bytes; it is ciphertext, not readable text.
+
 ### Reading get-method results
 
 ```php

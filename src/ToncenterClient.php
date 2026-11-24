@@ -254,7 +254,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         }
 
         try {
-            $json = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR | \JSON_BIGINT_AS_STRING);
+            $json = json_decode((string) $response->getBody(), true, 512, \JSON_THROW_ON_ERROR | \JSON_BIGINT_AS_STRING | \JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (JsonException $exception) {
             throw $this->failed(new TonRpcException(sprintf('Toncenter %s %s: invalid JSON', $method, $path), 0, $exception), $method, $path, $expectedCodes);
         }
@@ -306,7 +306,7 @@ final readonly class ToncenterClient implements ToncenterClientInterface
         $summary = sprintf('Toncenter %s %s returned HTTP %d', $method, $path, $status);
 
         try {
-            $json = json_decode($body, true, 512, \JSON_THROW_ON_ERROR | \JSON_BIGINT_AS_STRING);
+            $json = json_decode($body, true, 512, \JSON_THROW_ON_ERROR | \JSON_BIGINT_AS_STRING | \JSON_INVALID_UTF8_SUBSTITUTE);
         } catch (JsonException) {
             return new TonRpcException($summary);
         }
